@@ -1,2 +1,5 @@
-var main=require("./main.jsx");
-React.render(React.createElement(main),document.getElementById("main"));
+var runtime=require("ksana2015-webruntime");
+runtime.boot("_%name%_","main","main",function(){
+	var Main=React.createElement(require("./main.jsx"));
+	ksana.mainComponent=React.render(Main,document.getElementById("main"));
+});
