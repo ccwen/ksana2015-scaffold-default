@@ -11,10 +11,6 @@
     "height": 700
   },
   "scripts" : {
-    "watch":"watchify -t reactify index.js  -o bundle.js -dv --bare",
-    "build":"browserify -t reactify index.js -o bundle.js -dv --bare",
-    "start": "npm run nw && npm run watch",
-    "nw":"_%{process.platform=="win32"?"start":""}%_ node ..\\node_modules\\bin\\nodewebkit . --remote-debugging-port=9222 _%{process.platform!="win32"?"&":""}%_"
   },
  "repositories": [
   {
