@@ -1,5 +1,5 @@
 {
-  "name": "_%name%_",
+  "name": "scaffold-default",
   "description": "New Ksana application",
   "version": "0.0.1",
   "main": "index.html",
