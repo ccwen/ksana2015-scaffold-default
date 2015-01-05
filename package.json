@@ -12,10 +12,9 @@
   },
   "scripts" : {
   },
- "repositories": [
+ "repository": 
   {
       "type": "git", 
       "url": "_%giturl%_"
   }  
-  ]
 }
