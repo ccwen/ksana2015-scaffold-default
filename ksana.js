@@ -4,7 +4,7 @@ jsonp_handler({
 "title":"_%name%_",
 "minruntime": 4,
 "baseurl":"_%rawgit%_",
-"description":""
+"description":"",
 "files":
   ["index.html","build.js","build.css","jquery.js","react-with-addons.js","ksana.js",
   "_%name%_.kdb"]
