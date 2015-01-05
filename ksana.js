@@ -7,5 +7,5 @@ jsonp_handler({
 "description":"",
 "files":
   ["index.html","build.js","build.css","jquery.js","react-with-addons.js","ksana.js",
-  "_%name%_.kdb"]
+  "sample.kdb"]
 })
