@@ -6,6 +6,6 @@ jsonp_handler({
 "baseurl":"_%rawgit%_",
 "description":"",
 "files":
-  ["index.html","build.js","build.css","jquery.js","react-with-addons.js","ksana.js",
+  ["index.html","bundle.js","jquery.js","react-with-addons.js","ksana.js",
   "sample.kdb"]
 })

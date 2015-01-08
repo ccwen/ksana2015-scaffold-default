@@ -4,7 +4,7 @@ var maincomponent = React.createClass({
   	return {result:[]};
   },
   componentDidMount:function() {
-  	kse.search("sample","head",{range:{start:0}},function(err,data){
+  	kse.search("sample","資生",{range:{start:0}},function(err,data){
   		this.setState({result:data.excerpt});
   	},this);
   },
