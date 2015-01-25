@@ -2,7 +2,7 @@ jsonp_handler({
 "version": "1",
 "build": 1,
 "title":"_%name%_",
-"minruntime": 1.3 ,
+"minruntime": 1 ,
 "baseurl":"_%rawgit%_",
 "description":"",
 "files":
