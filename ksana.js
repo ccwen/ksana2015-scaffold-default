@@ -5,7 +5,13 @@ jsonp_handler({
 "minruntime": 1 ,
 "baseurl":"_%rawgit%_",
 "description":"",
+ "browserify": {
+  "external": [
+   "react",
+   "bootstrap"
+  ]
+ },
 "files":
-  ["index.html","index.css","bundle.js","jquery.js","react-with-addons.js","ksana.js",
+  ["index.html","index.css","react-bundle.js","bundle.js","jquery.js","ksana.js",
   "bootstrap.min.js","bootstrap.min.css","sample.kdb"]
 })
