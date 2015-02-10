@@ -7,4 +7,4 @@ ks mkdb sample
 
 react-bundle.js is created with 
 
-    browserify -r react -r react/addons.js > react-bundle.js
+    browserify -r react -r react/addons > react-bundle.js

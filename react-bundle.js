@@ -20004,7 +20004,7 @@ if ("production" !== process.env.NODE_ENV) {
 module.exports = warning;
 
 }).call(this,require('_process'))
-},{"./emptyFunction":122,"_process":1}],"react/addons.js":[function(require,module,exports){
+},{"./emptyFunction":122,"_process":1}],"react/addons":[function(require,module,exports){
 module.exports = require('./lib/ReactWithAddons');
 
 },{"./lib/ReactWithAddons":92}],"react":[function(require,module,exports){
