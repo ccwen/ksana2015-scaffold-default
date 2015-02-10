@@ -1,5 +1,4 @@
 var React=require("react");
-console.log(React.addons);
 var kse=require("ksana-search");
 var maincomponent = React.createClass({
   getInitialState:function() {
