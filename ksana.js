@@ -8,6 +8,7 @@ jsonp_handler({
  "browserify": {
   "external": [
    "react",
+   "react/addons",
    "bootstrap"
   ]
  },
