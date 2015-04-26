@@ -9,8 +9,7 @@ jsonp_handler({
   "external": [
    "react",
    "react/addons",
-   "bootstrap",
-   "react-native"
+   "bootstrap"
   ]
  },
 "files":
