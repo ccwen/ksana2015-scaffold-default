@@ -6,7 +6,8 @@ var maincomponent = React.createClass({
   },
   search:function() {
     kse.search("sample",this.state.tofind,{range:{start:0}},function(err,data){
-      this.setState({result:data.excerpt});
+      if (err) console.error(err);
+      else this.setState({result:data.excerpt});
     },this);
   },
   renderItem:function(item) {
