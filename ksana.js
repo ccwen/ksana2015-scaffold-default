@@ -9,10 +9,13 @@ jsonp_handler({
   "external": [
    "react",
    "react/addons",
-   "bootstrap"
+   "bootstrap",
+   "ksana-jsonrom",
+   "ksana-analyzer",
+   "ksana-database",
+   "ksana-search"
   ]
  },
 "files":
-  ["index.html","index.css","react-bundle.js","bundle.js","jquery.js","ksana.js",
-  "bootstrap.min.js","bootstrap.min.css"]
+  ["index.html","index.css","react-bundle.js","ksana-bundle.js","bundle.js","ksana.js"]
 })
