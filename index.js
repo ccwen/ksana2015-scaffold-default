@@ -1,7 +1,6 @@
 var React=require("react");
-var runtime=require("ksana2015-webruntime");
-runtime.boot("_%name%_",function(){
-	ksana.runtime=runtime;
+var ksanagap=require("ksana2015-webruntime/ksanagap");
+ksanagap.boot("_%name%_",function(){
 	var Main=React.createElement(require("./src/main.jsx"));
 	ksana.mainComponent=React.render(Main,document.getElementById("main"));
 });
