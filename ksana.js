@@ -13,7 +13,8 @@ jsonp_handler({
    "ksana-jsonrom",
    "ksana-analyzer",
    "ksana-database",
-   "ksana-search"
+   "ksana-search",
+   "ksana-simple-api"
   ]
  },
 "files":
