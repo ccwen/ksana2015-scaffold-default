@@ -8,7 +8,7 @@ var maincomponent = React.createClass({
     kse.search("sample",this.state.tofind,{range:{start:0}},function(err,data){
       if (err) console.error(err);
       else this.setState({result:data.excerpt});
-    },this);
+    }.bind(this));
   },
   renderItem:function(item) {
     return <div dangerouslySetInnerHTML={{__html:item.text}}></div>
