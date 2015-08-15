@@ -265,6 +265,7 @@ var kdblisted=false;
 
 var method=require("./method");
 
+
 var createLocalEngine=function(kdb,opts,cb,context) {
 	var engine={kdb:kdb, queryCache:{}, postingCache:{}, cache:{}, TOC:{} };
 	if (typeof context=="object") engine.context=context;
@@ -277,6 +278,7 @@ var createLocalEngine=function(kdb,opts,cb,context) {
 		engine.dbname=res[0].name;
 		//engine.customfunc=customfunc.getAPI(res[0].config);
 		engine.ready=true;
+		method.hotfix_segoffset_before20150710(engine);
 	}
 	var preload=method.getPreloadField(opts.preload);
 	var opts={recursive:true};
@@ -286,7 +288,6 @@ var createLocalEngine=function(kdb,opts,cb,context) {
 	}]);
 	return engine;
 }
-
 
  //TODO delete directly from kdb instance
  //kdb.free();
@@ -551,6 +552,7 @@ var createRemoteEngine=function(kdb,opts,cb,context) {
 		engine.dbname=res[0].name;
 		//engine.customfunc=customfunc.getAPI(res[0].config);
 		engine.ready=true;
+		method.hotfix_segoffset_before20150710(engine);
 	}
 	var preload=method.getPreloadField(opts.preload);
 	var opts={recursive:true};
@@ -1041,13 +1043,18 @@ var vpos2txtid=function(vpos){
 var nextTxtid=function(txtid) {
 	var txtid_idx=this.get("txtid_idx");
 	var start=bsearch(this.get("txtid"),txtid);
-	if (start==-1) return null;
+	if (start===-1 || start===txtid_idx.length-1) return null;
 	var absseg=txtid_idx[start];
-	newvpos=absSegToVpos.call(this,absseg);
+	var newvpos=absSegToVpos.call(this,absseg);
 	return vpos2txtid.call(this,newvpos);
 }
 var prevTxtid=function(txtid) {
-	
+	var txtid_idx=this.get("txtid_idx");
+	var start=bsearch(this.get("txtid"),txtid);
+	if (start===-1 || txtid_idx[start]<2) return null;
+	var absseg=txtid_idx[start]-2;
+	var newvpos=absSegToVpos.call(this,absseg);
+	return vpos2txtid.call(this,newvpos);
 }
 var txtid2vpos=function(txtid) {
 	var txtid_idx=this.get("txtid_idx");
@@ -1083,8 +1090,15 @@ var setup=function(engine) {
 	engine.nextTxtid=nextTxtid;
 	engine.prevTxtid=prevTxtid;
 }
-
-module.exports={setup:setup,getPreloadField:getPreloadField,gets:gets};
+var hotfix_segoffset_before20150710=function(engine) {
+	var so=engine.get("segoffsets");
+	if (so.length>2 && so[so.length-1]===so[so.length-2]) {
+		so.unshift(1);
+		so.pop();
+		console.log("old segoffsets, better rebuild your kdb")
+	}
+}
+module.exports={setup:setup,getPreloadField:getPreloadField,gets:gets,hotfix_segoffset_before20150710:hotfix_segoffset_before20150710};
 },{"./bsearch":3}],8:[function(require,module,exports){
 var getPlatform=function() {
 	if (typeof ksanagap=="undefined") {
@@ -4378,6 +4392,21 @@ var kse=require("ksana-search");
 var kde=require("ksana-database");
 var bsearch=kde.bsearch;
 
+//make sure db is opened
+var nextUti=function(opts,cb){
+	kde.open(opts.db,function(err,db){
+		if (err) cb(err);
+		else cb(0,db.nextTxtid(opts.uti));
+	});		
+}
+//make sure db is opened
+var prevUti=function(opts,cb){
+	kde.open(opts.db,function(err,db){
+		if (err) cb(err);
+		else cb(0,db.prevTxtid(opts.uti));
+	});		
+}
+
 var next=function(opts,cb,context) {
 	kse.search(opts.db,opts.q,function(err,res){
 		var db=res.engine;
@@ -4408,7 +4437,7 @@ var toc=function(opts,cb,context) {
 		} else {
 			var tocname=res.engine.get("meta").toc;
 			res.engine.getTOC({tocname:tocname},function(data){
-				cb(0,{name:tocname,toc:data,hits:res.rawresult});
+				cb(0,{name:tocname,toc:data,hits:res.rawresult,tocname:tocname});
 			});
 		}
 	});
@@ -4428,13 +4457,9 @@ var txtids2key=function(txtids) {
 
 var hits2markup=function( Q,file,seg, text){
 	var seg1=this.fileSegToAbsSeg(file,seg);
-	var vpos=this.absSegToVpos(seg1-1);
-	var vpos2=this.absSegToVpos(seg1);
-	//console.log("rawresult",Q.rawresult,vpos,vpos2)
+	var vpos=this.absSegToVpos(seg1);
+	var vpos2=this.absSegToVpos(seg1+1);
 	var hits=kse.excerpt.realHitInRange(Q,vpos,vpos2,text);
-	for (var i=0;i<hits.length;i++) {
-		hits[i][2]="HL"+hits[i][2];
-	}
 	return hits;
 }
 var fetch=function(opts,cb,context) {
@@ -4457,10 +4482,14 @@ var fetch=function(opts,cb,context) {
 				}
 			}
 			var keys=txtids2key.call(res.engine,uti);
-			
+			if (typeof keys[0][1]=="undefined") {
+				cb("uti not found: "+uti+" in "+opts.db);
+				return;
+			}
+
 			res.engine.get(keys,function(data){
 				var out=[];
-				for (var i=0;i<uti.length;i++) {
+				for (var i=0;i<keys.length;i++) {
 					var hits=hits2markup.call(res.engine,res,keys[i][1],keys[i][2],data[i]);
 					var vpos=res.engine.txtid2vpos(uti[i]);
 					out.push({uti:uti[i],text:data[i],hits:hits,vpos:vpos});
@@ -4558,15 +4587,51 @@ var filter=function(opts,cb,context) {
 		}
 	});
 }
+var listkdb=kde.listkdb;
+
+
+var fillHits=function(searchable,tofind,cb) {
+	var taskqueue=[],out=[];
+	for (var i=0;i<searchable.length;i++) {
+		(function(dbname){
+			taskqueue.push(function(err,data){
+				if (typeof data=='object' && data.__empty) {
+					//not pushing the first call
+				} else {
+					searchable.map(function(db){
+						if (db.shortname===data.dbname) {
+							db.hits=data.rawresult.length;
+						}
+					})
+				}
+				kse.search(dbname,tofind,taskqueue.shift(0,data));
+			});;
+		})(searchable[i].fullname)
+	};
+
+	taskqueue.push(function(err,data){
+
+		searchable.sort(function(a,b){
+			return b.hits-a.hits;
+		});
+
+		cb(searchable);
+	});
+	taskqueue.shift()(0,{__empty:true});
+}
 
 var API={
 	next:next,
 	prev:prev,
+	nextUti:nextUti,
+	prevUti:prevUti,	
 	toc:toc,
 	fetch:fetch,
 	excerpt:excerpt,
 	scan:scan,
-	filter:filter
+	filter:filter,
+	listkdb:listkdb,
+	fillHits:fillHits
 }
 module.exports=API;
 },{"ksana-database":"ksana-database","ksana-search":"ksana-search"}]},{},[]);
