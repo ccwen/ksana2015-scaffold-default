@@ -1,1 +1,1 @@
-browserify --bare -r react -r react/addons > react-bundle.js
+browserify -r react -r react-addons-update -r react-addons-pure-render-mixin> react-bundle.js
