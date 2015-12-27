@@ -212,16 +212,16 @@ var simple=function(s) {
 }
 module.exports={simple:simple,tibetan:tibetan};
 },{}],3:[function(require,module,exports){
-var indexOfSorted = function (array, obj, near) { 
-  var low = 0,
-  high = array.length;
+'use strict';
+var indexOfSorted = function (array, obj, near) {
+  var low = 0, high = array.length, mid;
   while (low < high) {
-    var mid = (low + high) >> 1;
-    if (array[mid]===obj) return mid;
+    mid = (low + high) >> 1;
+    if (array[mid] === obj) return mid;
     array[mid] < obj ? low = mid + 1 : high = mid;
   }
   if (near) return low;
-  else if (array[low]===obj) return low;else return -1;
+  else if (array[low] === obj) return low;else return -1;
 };
 var indexOfSorted_str = function (array, obj, near) { 
   var low = 0,
@@ -281,10 +281,13 @@ var createLocalEngine=function(kdb,opts,cb,context) {
 		method.hotfix_segoffset_before20150710(engine);
 		method.buildSegnameIndex(engine);
 	}
+
+		var t=new Date();
 	var preload=method.getPreloadField(opts.preload);
 	var opts={recursive:true};
 	method.gets.apply(engine,[ preload, opts,function(res){
 		setPreload(res);
+		//console.log("pre load ",new Date()-t)
 		cb.apply(engine.context,[engine]);
 	}]);
 	return engine;
@@ -316,8 +319,14 @@ var getLocalTries=function(kdbfn,cb) {
 }
 
 var openLocalReactNative=function(kdbid,opts,cb,context) {
-
 	if (kdbid.indexOf(".kdb")==-1) kdbid+=".kdb";
+
+	var engine=localPool[kdbid];
+	if (engine) {
+		cb.apply(context||engine.context,[0,engine]);
+		return;
+	}
+
 	new Kdb.open(kdbid,function(err,kdb){
 		if (err) {
 			cb.apply(context,[err]);
@@ -333,6 +342,13 @@ var openLocalReactNative=function(kdbid,opts,cb,context) {
 
 var openLocalKsanagap=function(kdbid,opts,cb,context) {
 	var kdbfn=kdbid;
+
+
+	var engine=localPool[kdbid];
+	if (engine) {
+		cb.apply(context||engine.context,[0,engine]);
+		return;
+	}
 	var tries=getLocalTries(kdbfn);
 
 	for (var i=0;i<tries.length;i++) {
@@ -357,6 +373,13 @@ var openLocalKsanagap=function(kdbid,opts,cb,context) {
 }
 var openLocalNode=function(kdbid,opts,cb,context) {
 	var fs=require('fs');
+
+	var engine=localPool[kdbid];
+	if (engine) {
+		cb.apply(context||engine.context,[0,engine]);
+		return;
+	}
+
 	var tries=getLocalTries(kdbid);
 	for (var i=0;i<tries.length;i++) {
 		if (fs.existsSync(tries[i])) {
@@ -382,7 +405,7 @@ var openLocalFile=function(file,opts,cb,context) {
 
 		var engine=localPool[kdbid];
 		if (engine) {
-			cb(0,engine);
+			cb.apply(context||engine.context,[0,engine]);
 			return;
 		}
 
@@ -441,7 +464,7 @@ var open=function(kdbid,opts,cb,context)  {
 		openLocalNode(kdbid,opts,cb,context);
 	} else if (platform=="html5" || platform=="chrome"){
 		openLocalHtml5(kdbid,opts,cb,context);		
-	} else if (platform=="react-native") {
+	} else if (platform.substr(0,12)=="react-native") {
 		openLocalReactNative(kdbid,opts,cb,context);	
 	} else {
 		openLocalKsanagap(kdbid,opts,cb,context);	
@@ -480,7 +503,7 @@ var API={open:open,setPath:setPath, close:closeLocal, enumKdb:enumKdb, bsearch:b
 kdbs:kdbs,listkdb:listkdb};
 
 var platform=require("./platform").getPlatform();
-if (platform=="node-webkit" || platform=="node" || platform=="react-native") {
+if (platform=="node-webkit" || platform=="node" || platform.substr(0,12)=="react-native") {
 	enumKdb();
 } else if (typeof io!=="undefined") {
 	API.rpc=require("./rpc_kde"); //for browser only
@@ -625,6 +648,20 @@ var listkdb_html5=function(cb,context) {
 			cb.call(this,kdbs);
 	},context||this);		
 }
+var listkdb_rn_ios=function(cb,context) {
+	cb(0,[]);
+}
+var listkdb_rn_android=function(cb,context) {
+	/*
+	kfs=require("react-native-android-kdb");	
+	
+	kfs.readDir(".",function(kdbs){
+			cb.call(this,kdbs);
+	},context||this);		
+*/
+	cb(0,[]);
+}
+
 var listkdb_rpc=function() {
 	var fs=require("fs");
 	var path=require("path");
@@ -637,6 +674,9 @@ var filterkdb=function(files,parent){
 	var output=[];
 	var fs=require("fs");
 	var path=require("path");
+	if (parent.length==3 && parent[1]==":") {
+		return output;
+	}
 	files.map(function(f){
 		var subdir=parent+path.sep+f;
 		var stat=fs.statSync(subdir);
@@ -655,6 +695,7 @@ var filterkdb=function(files,parent){
 	});
 	return output;
 }	
+
 
 var listkdb_node=function(cb,context){
 	var fs=require("fs");
@@ -701,6 +742,10 @@ var listkdb=function(cb,context) {
 		listkdb_node(cb,context);
 	} else if (platform=="chrome") {
 		listkdb_html5(cb,context);
+	} else if (platform=="react-native-android"){
+		listkdb_rn_android(cb,context);
+	} else if (platform=="react-native-ios"){
+		listkdb_rn_ios(cb,context);
 	} else {
 		listkdb_ksanagap(cb,context);
 	}
@@ -710,6 +755,7 @@ listkdb.sync=listkdb_rpc;
 module.exports=listkdb;
 },{"./platform":8,"fs":undefined,"path":undefined}],7:[function(require,module,exports){
 var bsearch=require("./bsearch");
+var verbose=false;
 var gets=function(paths,opts,cb) { //get many data with one call
 
 	if (!paths) return ;
@@ -833,17 +879,6 @@ var fileSegToAbsSeg=function(file,seg) {
 //	segid-=range.start;
 //    return {file:fileid,seg:segid};
 //}
-var indexOfSorted_str = function (array, obj, near) { 
-  var low = 0,
-  high = array.length;
-  while (low < high) {
-    var mid = (low + high) >> 1;
-    if (array[mid]==obj) return mid;
-    (array[mid].localeCompare(obj)<0) ? low = mid + 1 : high = mid;
-  }
-  if (near) return low;
-  else if (array[low]==obj) return low;else return -1;
-};
 var searchSeg=function(segname,near) {
 	var i=bsearch(this.get("segnames"),segname,near);
 	if (i>-1) {
@@ -1004,7 +1039,7 @@ var getDefaultTOC=function(opts,cb,context) {
 		out.push({t:fn,d:depth, vpos:fileoffsets[i]});
 		var range=getFileRange.apply(this,[i]);
 		for (var j=range.start;j<range.end+1;j++) {
-			out.push({t:segnames[j],d:depth+1, vpos:segoffsets[j-1]||1});
+			out.push({t:segnames[j],d:depth+1, vpos:segoffsets[j]||1});
 		}
 	}
 	this.TOC["_"]=out;
@@ -1080,13 +1115,13 @@ var nextTxtid=function(txtid) {
 	var absseg=txt2absseg.call(this,txtid);
 	if (!absseg) return;
 	var segnames=this.get("segnames");
-	return segnames[absseg];
+	return segnames[absseg+1];
 }
 var prevTxtid=function(txtid) {
 	var absseg=txt2absseg.call(this,txtid);
 	if (!absseg) return;
 	var segnames=this.get("segnames");
-	return segnames[absseg-2];
+	return segnames[absseg-1];
 }
 var txtid2vpos=function(txtid) {
 	var absseg=txt2absseg.call(this,txtid);
@@ -1124,6 +1159,8 @@ var setup=function(engine) {
 }
 var hotfix_segoffset_before20150710=function(engine) {
 	var so=engine.get("segoffsets");
+	if (!so) so=engine.get("segOffsets");
+	if (!so) return;
 	if (so.length>2 && so[so.length-1]===so[so.length-2]) {
 		so.unshift(1);
 		so.pop();
@@ -1133,11 +1170,17 @@ var hotfix_segoffset_before20150710=function(engine) {
 var buildSegnameIndex=function(engine){
 	/* replace txtid,txtid_idx, txtid_invert , save 400ms load time */
 	var segnames=engine.get("segnames");
+	if (!segnames) {
+		console.log("missing segnames, cannot build uti");
+		return;
+	}
 	var segindex={};
+	if (verbose) console.time("build segname index");
 	for (var i=0;i<segnames.length;i++) {
 		var segname=segnames[i];
 		segindex[segname]=i;
 	}
+	if (verbose) console.timeEnd("build segname index");
 	engine.txtid=segindex;
 }
 module.exports={setup:setup,getPreloadField:getPreloadField,gets:gets
@@ -1147,8 +1190,18 @@ module.exports={setup:setup,getPreloadField:getPreloadField,gets:gets
 var getPlatform=function() {
 	if (typeof ksanagap=="undefined") {
 		try {
-			require("react-native");
-			platform="react-native";
+			var react_native=require("react-native");
+			try {
+				var OS=react_native.Platform.OS;
+				if (OS==='android') {
+					require("react-native-android-kdb");
+					platform="react-native-android";					
+				} else {
+					platform="react-native-ios";	
+				}
+			} catch (e) {
+				platform='chrome';
+			}
 		} catch (e) {
 			if (typeof process=="undefined") {
 				platform="chrome";
@@ -1162,7 +1215,7 @@ var getPlatform=function() {
 	return platform;
 }
 module.exports={getPlatform:getPlatform};
-},{"react-native":undefined}],9:[function(require,module,exports){
+},{"react-native":undefined,"react-native-android-kdb":undefined}],9:[function(require,module,exports){
 /*
 	this is for browser, a simple wrapper for socket.io rpc
 	
@@ -1366,8 +1419,14 @@ var Kfs=null;
 
 if (typeof ksanagap=="undefined") {
 	try {
-		require("react-native");
-		Kfs=require("./kdbfs_ios");
+		var react_native=require("react-native");
+		var OS=react_native.Platform.OS;
+		if (OS=='android') {
+			require("react-native-android-kdb");
+			Kfs=require("./kdbfs_rn_android");
+		} else {
+			Kfs=require("./kdbfs_ios");
+		}
 	} catch(e) {
 		Kfs=require('./kdbfs');	
 	}			
@@ -1862,7 +1921,7 @@ Create.datatypes=DT;
 if (module) module.exports=Create;
 //return Create;
 
-},{"./kdbfs":13,"./kdbfs_android":14,"./kdbfs_ios":15,"react-native":undefined}],13:[function(require,module,exports){
+},{"./kdbfs":13,"./kdbfs_android":14,"./kdbfs_ios":15,"./kdbfs_rn_android":16,"react-native":undefined,"react-native-android-kdb":undefined}],13:[function(require,module,exports){
 /* node.js and html5 file system abstraction layer*/
 try {
 	var fs=require("fs");
@@ -2550,6 +2609,140 @@ var Open=function(path,opts,cb) {
 module.exports=Open;
 },{}],16:[function(require,module,exports){
 /*
+  binding for react native android
+  JAVA can only return Number and String
+	array and buffer return in string format
+	need JSON.parse
+*/
+var kfs=require("react-native-android-kdb");
+
+var verbose=0;
+
+var readSignature=function(pos,cb) {
+	if (verbose) console.debug("read signature");
+	kfs.readUTF8String(this.handle,pos,1,function(signature){
+		if (verbose) console.debug(signature,signature.charCodeAt(0));
+		cb.apply(this,[signature]);	
+	});
+}
+var readI32=function(pos,cb) {
+	if (verbose) console.debug("read i32 at "+pos);
+	kfs.readInt32(this.handle,pos,function(i32){
+		if (verbose) console.debug(i32);
+		cb.apply(this,[i32]);	
+	});
+}
+var readUI32=function(pos,cb) {
+	if (verbose) console.debug("read ui32 at "+pos);
+	kfs.readUInt32(this.handle,pos,function(ui32){
+		if (verbose) console.debug(ui32);
+		cb.apply(this,[ui32]);
+	});
+}
+var readUI8=function(pos,cb) {
+	if (verbose) console.debug("read ui8 at "+pos); 
+	kfs.readUInt8(this.handle,pos,function(ui8){
+		if (verbose) console.debug(ui8);
+		cb.apply(this,[ui8]);
+	});
+}
+var readBuf=function(pos,blocksize,cb) {
+	if (verbose) console.debug("read buffer at "+pos+ " blocksize "+blocksize);
+	kfs.readBuf(this.handle,pos,blocksize,function(buff){
+		//var buff=JSON.parse(buf);
+		if (verbose) console.debug("buffer length"+buff.length);
+		cb.apply(this,[buff]);
+	});
+}
+var readBuf_packedint=function(pos,blocksize,count,reset,cb) {
+	if (verbose) console.debug("read packed int at "+pos+" blocksize "+blocksize+" count "+count);
+	kfs.readBuf_packedint(this.handle,pos,blocksize,count,reset,function(buf){
+		var adv=parseInt(buf);
+		var buff=JSON.parse(buf.substr(buf.indexOf("[")));
+		if (verbose) console.debug("packedInt length "+buff.length+" first item="+buff[0]);
+		cb.apply(this,[{data:buff,adv:adv}]);	
+	});	
+}
+
+
+var readString= function(pos,blocksize,encoding,cb) {
+	if (verbose) console.debug("readstring at "+pos+" blocksize " +blocksize+" enc:"+encoding);
+	if (encoding=="ucs2") {
+		var func=kfs.readULE16String;
+	} else {
+		var func=kfs.readUTF8String
+	}	 
+	func(this.handle,pos,blocksize,function(str){
+		if (verbose) console.debug(str);
+		cb.apply(this,[str]);	
+	})
+}
+
+var readFixedArray = function(pos ,count, unitsize,cb) {
+	if (verbose) console.debug("read fixed array at "+pos+" count "+count+" unitsize "+unitsize); 
+	kfs.readFixedArray(this.handle,pos,count,unitsize,function(buf){
+		var buff=JSON.parse(buf);
+		if (verbose) console.debug("array length"+buff.length);
+		cb.apply(this,[buff]);	
+	});
+}
+var readStringArray = function(pos,blocksize,encoding,cb) {
+	if (verbose) console.log("read String array at "+pos+" blocksize "+blocksize +" enc "+encoding); 
+	encoding = encoding||"utf8";
+	kfs.readStringArray(this.handle,pos,blocksize,encoding,function(buf){
+		//var buff=JSON.parse(buf);
+		if (verbose) console.debug("read string array");
+		var buff=buf.split("\uffff"); //cannot return string with 0
+		if (verbose) console.debug("array length"+buff.length);
+		cb.apply(this,[buff]);			
+	});
+}
+var mergePostings=function(positions,cb) {
+	kfs.mergePostings(this.handle,JSON.stringify(positions),function(buf){
+		if (!buf || buf.length==0) return cb([]);
+		else return cb(JSON.parse(buf));
+	});
+}
+
+var free=function() {
+	//console.log('closing ',handle);
+	kfs.close(this.handle);
+}
+var Open=function(path,opts,cb) {
+	opts=opts||{};
+	var signature_size=1;
+	var setupapi=function() { 
+		this.readSignature=readSignature;
+		this.readI32=readI32;
+		this.readUI32=readUI32;
+		this.readUI8=readUI8;
+		this.readBuf=readBuf;
+		this.readBuf_packedint=readBuf_packedint;
+		this.readFixedArray=readFixedArray;
+		this.readString=readString;
+		this.readStringArray=readStringArray;
+		this.signature_size=signature_size;
+		this.mergePostings=mergePostings;
+		this.free=free;
+		kfs.getFileSize(this.handle,function(size){
+			this.size=size;
+		}.bind(this));
+		if (verbose) console.log("filesize  "+this.size);
+		if (cb)	cb.call(this);
+	}
+
+	kfs.open(path,function(handle){
+		this.handle=handle;
+		this.opened=true;
+		setupapi.call(this);
+	}.bind(this));
+
+	return this;
+}
+
+module.exports=Open;
+},{"react-native-android-kdb":undefined}],17:[function(require,module,exports){
+/*
   TODO
   and not
 
@@ -2643,42 +2836,7 @@ var boolSearch=function(opts) {
 	return this;
 }
 module.exports={search:boolSearch}
-},{"./plist":20}],17:[function(require,module,exports){
-var indexOfSorted = function (array, obj, near) { 
-  var low = 0,
-  high = array.length;
-  while (low < high) {
-    var mid = (low + high) >> 1;
-    if (array[mid]==obj) return mid;
-    array[mid] < obj ? low = mid + 1 : high = mid;
-  }
-  if (near) return low;
-  else if (array[low]==obj) return low;else return -1;
-};
-var indexOfSorted_str = function (array, obj, near) { 
-  var low = 0,
-  high = array.length;
-  while (low < high) {
-    var mid = (low + high) >> 1;
-    if (array[mid]==obj) return mid;
-    (array[mid].localeCompare(obj)<0) ? low = mid + 1 : high = mid;
-  }
-  if (near) return low;
-  else if (array[low]==obj) return low;else return -1;
-};
-
-
-var bsearch=function(array,value,near) {
-	var func=indexOfSorted;
-	if (typeof array[0]=="string") func=indexOfSorted_str;
-	return func(array,value,near);
-}
-var bsearchNear=function(array,value) {
-	return bsearch(array,value,true);
-}
-
-module.exports=bsearch;
-},{}],18:[function(require,module,exports){
+},{"./plist":20}],18:[function(require,module,exports){
 var plist=require("./plist");
 var fetchtext=require("./fetchtext");
 var getPhraseWidths=function (Q,phraseid,vposs) {
@@ -2880,7 +3038,7 @@ var resultlist=function(engine,Q,opts,cb) {
 		}
 
 		if (opts.range.from) {
-			opts.range.start=engine.txtid2vpos(engine.nextTxtid(opts.range.from));
+			opts.range.start=engine.txtid2vpos(engine.nextTxtid(opts.range.from))+1;
 		}
 	}
 	var fileWithHits=getFileWithHits(engine,Q,opts.range);
@@ -2910,8 +3068,9 @@ var resultlist=function(engine,Q,opts,cb) {
 			if (segoffset>opts.range.end) break;
 
 			output.push(  {file: nfile, seg:j,  segname:segnames[j]});
-			if (output.length>opts.range.maxseg) break;
+			if (output.length>=opts.range.maxseg) break;
 		}
+		if (output.length>=opts.range.maxseg) break;
 	}
 	var segpaths=output.map(function(p){
 		return ["filecontents",p.file,p.seg];
@@ -3352,7 +3511,7 @@ var groupbyposting=function(arr,gposting) { //relative vpos
 }
 var groupbyposting2=function(arr,gposting) { //absolute vpos
   if (!arr || !arr.length) return [];
-  if (!gposting.length) return [arr.length];
+  if (!gposting || !gposting.length) return [arr.length];
   var out=[];
   for (var i=0;i<=gposting.length;i++) out[i]=[];
   
@@ -3368,7 +3527,7 @@ var groupbyposting2=function(arr,gposting) { //absolute vpos
     p++;
   }
   //remaining
-  while(i<arr.length) out[out.length-1].push(arr[i++]-gposting[gposting.length-1]);
+  while(i<arr.length) out[out.length-1].push(arr[i++]);
   return out;
 }
 var groupbyblock2 = function(ar, ntoken,slotshift,opts) {
@@ -3764,6 +3923,9 @@ var expandTerm=function(engine,regex) {
 var isWildcard=function(raw) {
 	return !!raw.match(/[\*\?]/);
 }
+var hasWildcard=function(raw) {
+	return ~raw.indexOf("?") || ~raw.indexOf("*");
+}
 
 var isOrTerm=function(term) {
 	term=term.trim();
@@ -3827,7 +3989,7 @@ var parseNumber=function(raw) {
 	}
 }
 var parseWildcard=function(raw) {
-	var n=parseNumber(raw) || 1;
+	var n=parseNumber(raw.substr(1)) || 1;
 	var qcount=raw.split('?').length-1;
 	var scount=raw.split('*').length-1;
 	var type='';
@@ -4002,11 +4164,21 @@ var fastPhrase=function(engine,phrase,cb) {
 	});
 }
 var slowPhrase=function(engine,terms,phrase) {
-	var j=0,tokens=engine.analyzer.tokenize(phrase).tokens;
+	var parts=[],lastidx=0;
+	phrase.replace(/[ ་]?([\?\*]\d?)[ ་]?/g,function(m,m1,idx){
+		s=phrase.substring(lastidx,idx);
+		parts.push(s);
+		parts.push(m1);
+		lastidx=idx+m.length;
+	});
+
+	parts.push(phrase.substring(lastidx));
+	
+	var j=0;//,tokens=engine.analyzer.tokenize(phrase).tokens;
 	var phrase_term=newPhrase();
 	var termid=0;
-	while (j<tokens.length) {
-		var raw=tokens[j], termlength=1;
+	while (j<parts.length) {
+		var raw=parts[j], termlength=1;
 		if (isWildcard(raw)) {
 			if (phrase_term.termid.length==0)  { //skip leading wild card
 				j++
@@ -4017,7 +4189,7 @@ var slowPhrase=function(engine,terms,phrase) {
 			phrase_term.termid.push(termid);
 			phrase_term.termlength.push(termlength);
 		} else if (isOrTerm(raw)){
-			var term=orTerms.apply(this,[tokens,j]);
+			var term=orTerms.apply(this,[parts,j]);
 			if (term) {
 				terms.push(term);
 				termid=terms.length-1;
@@ -4027,15 +4199,8 @@ var slowPhrase=function(engine,terms,phrase) {
 			phrase_term.termid.push(termid);
 			phrase_term.termlength.push(termlength);
 		} else {
-			var phrase="";
-			while (j<tokens.length) {
-				if (!(isWildcard(tokens[j]) || isOrTerm(tokens[j]))) {
-					phrase+=tokens[j];
-					j++;
-				} else break;
-			}
 
-			var splitted=splitPhrase(engine,phrase);
+			var splitted=splitPhrase(engine,parts[j]);
 			for (var i=0;i<splitted.tokens.length;i++) {
 				var term=parseTerm(engine,splitted.tokens[i]);
 				if (!term) continue;
@@ -4101,8 +4266,7 @@ var newQuery =function(engine,query,opts,cb) {
 				}
 			}
 
-			if (isSimplePhrase(phrases[pc]) && engine.mergePostings ) {
-				
+			if (isSimplePhrase(phrases[pc]) && engine.mergePostings && !hasWildcard(phrases[pc]) ) {
 				fastPhrase(engine,phrases[pc],function(res){
 					taskqueue.shift()(res);
 				});
@@ -4256,7 +4420,8 @@ var main=function(engine,q,opts,cb){
 				if (!Q.phrases[0].posting) {
 					engine.searchtime=new Date()-starttime;
 					engine.totaltime=engine.searchtime;
-					cb.apply(engine.context,["no such posting",{rawresult:[]}]);
+					Q.rawresult=[];
+					cb.apply(engine.context,["no such posting",Q]);
 					return;			
 				}
 				
@@ -4269,17 +4434,17 @@ var main=function(engine,q,opts,cb){
 					phrase_intersect(engine,Q);
 				}
 				var fileoffsets=Q.engine.get("fileoffsets");
-				//console.log("search opts "+JSON.stringify(opts));
-
-				if (!Q.byFile && Q.rawresult && Q.rawresult.length && !opts.nogroup) {
-					Q.byFile=plist.groupbyposting2(Q.rawresult, fileoffsets);
-					Q.byFile.shift();Q.byFile.pop();
-					Q.byFolder=groupByFolder(engine,Q.byFile);
-
-					countFolderFile(Q);
-				}
-
+				//console.log("search opts "+JSON.stringify(opts));	
+				
 				if (opts.range) {
+					if (!Q.byFile && Q.rawresult && Q.rawresult.length) {
+						//console.log("grouping",Q.rawresult.length,fileoffsets.length)
+						Q.byFile=plist.groupbyposting2(Q.rawresult, fileoffsets);
+						Q.byFile.shift();Q.byFile.pop();
+						Q.byFolder=groupByFolder(engine,Q.byFile);
+						countFolderFile(Q);
+					}
+
 					engine.searchtime=new Date()-starttime;
 					excerpt.resultlist(engine,Q,opts,function(data) { 
 						//console.log("excerpt ok");
@@ -4302,8 +4467,72 @@ var main=function(engine,q,opts,cb){
 }
 
 main.splitPhrase=splitPhrase; //just for debug
+main.slowPhrase=slowPhrase;
 module.exports=main;
-},{"./boolsearch":16,"./excerpt":18,"./plist":20}],"ksana-analyzer":[function(require,module,exports){
+},{"./boolsearch":17,"./excerpt":18,"./plist":20}],22:[function(require,module,exports){
+var rangeOfTreeNode=function(toc,n) {
+  //setting the ending vpos of a treenode
+  //this value is fixed when hits is changed, but not saved in kdb
+  if (typeof toc[n].end!=="undefined") return;
+
+  if (n+1>=toc.length) {
+    return;
+  }
+  var depth=toc[n].d , nextdepth=toc[n+1].d;
+  if (n==toc.length-1 || n==0) {
+      toc[n].end=Math.pow(2, 48);
+      return;
+  } else  if (nextdepth>depth){
+    if (toc[n].n) {
+    	if (toc[toc[n].n]) toc[n].end=toc[toc[n].n].vpos;
+    	else toc[n].end= Number.MAX_VALUE;  
+    } else { //last sibling
+      var next=n+1;
+      while (next<toc.length && toc[next].d>depth) next++;
+      if (next==toc.length) toc[n].end=Math.pow(2,48);
+      else toc[n].end=toc[next].voff;
+    }
+  } else { //same level or end of sibling
+    toc[n].end=toc[n+1].vpos;
+  }
+}
+var calculateHit=function(toc,hits,n) {
+
+  var start=toc[n].vpos;
+  var end=toc[n].end;
+  if (n==0) {
+    return hits.length;
+  } else {
+    var hitcount=0,firstvpos=start;
+    for (var i=0;i<hits.length;i++) {
+      if (hits[i]>=start && hits[i]<end) {
+        if (hitcount==0) firstvpos=hits[i];
+       hitcount++;
+      }
+    }
+    return {hitcount:hitcount,firstvpos:firstvpos};
+  }
+}
+
+var treenodehits=function(toc,hits,n) {
+  if (!hits || !hits.length) return 0;
+
+  if (toc.length<2) return 0 ;
+
+  //need to clear toc[n].hit when hits is changed.
+  //see index.js clearHits()
+   if (!toc[n]) return 0;
+  if (typeof toc[n].hit!=="undefined") return toc[n].hit;
+
+  rangeOfTreeNode(toc,n);
+  var res=calculateHit(toc,hits,n);
+  toc[n].hit=res.hitcount;
+  toc[n].firstvpos=res.firstvpos;
+  return res.hitcount;
+}
+
+module.exports=treenodehits;
+},{}],"ksana-analyzer":[function(require,module,exports){
 /* 
   custom func for building and searching ydb
 
@@ -4354,7 +4583,6 @@ module.exports={
 
 //  need a KDE instance to be functional
 
-var bsearch=require("./bsearch");
 var dosearch=require("./search");
 
 var prepareEngineForSearch=function(engine,cb){
@@ -4479,9 +4707,11 @@ var api={
 	,highlightRange:_highlightRange
 	,searchInTag:_searchInTag
 	,excerpt:require("./excerpt")	
+	,open:openEngine
+	,_search:dosearch
 }
 module.exports=api;
-},{"./bsearch":17,"./excerpt":18,"./fetchtext":19,"./search":21,"ksana-analyzer":"ksana-analyzer","ksana-database":"ksana-database"}],"ksana-simple-api":[function(require,module,exports){
+},{"./excerpt":18,"./fetchtext":19,"./search":21,"ksana-analyzer":"ksana-analyzer","ksana-database":"ksana-database"}],"ksana-simple-api":[function(require,module,exports){
 /*
 	TODO : fetch tags
 	render tags
@@ -4492,7 +4722,7 @@ var kse=require("ksana-search");
 var plist=require("ksana-search/plist");
 var kde=require("ksana-database");
 var bsearch=kde.bsearch;
-
+var treenodehits=require("./treenodehits");
 //make sure db is opened
 var nextUti=function(opts,cb){
 	kde.open(opts.db,function(err,db){
@@ -4508,24 +4738,35 @@ var prevUti=function(opts,cb){
 	});		
 }
 
-var _iterate=function(funcname,opts,cb,context) {
-	kse.search(opts.db,opts.q,function(err,res){
-		var db=res.engine;
-		if (err) {
-			cb(err);
-			return;
-		}
-		var out=[];
-		var next=opts.uti;
-		var count=opts.count||10;
-		var func=db[funcname];
-		for (var i=0;i<count;i++) {
-			var next=func(next);
-			if (!next) break;
+var __iterate=function(db,funcname,opts,cb,context){
+	var out=[];
+	var next=opts.uti;
+	var count=opts.count||10;
+	var func=db[funcname];
+	for (var i=0;i<count;i++) {
+		next=func.call(db,next);
+		if (!next) break;
+
+		if (funcname==="nextTxtid") {
 			out.push(next);
+		} else {
+			out.unshift(next);
 		}
-		opts.uti=out;
-		fetch(opts,cb,context);
+	}
+	opts.uti=out;
+	fetch(opts,cb,context);
+}
+var _iterate=function(funcname,opts,cb,context) {
+	if (!opts.q) {
+		kde.open(opts.db,function(err,db){
+			if (!err) __iterate(db,funcname,opts,cb,context);
+			else console.error(err);
+		});
+		return;
+	}
+	kse.search(opts.db,opts.q,opts,function(err,res){
+		if (!err) __iterate(res.engine,funcname,opts,cb,context);
+		else console.error(err);
 	});
 }
 
@@ -4536,17 +4777,69 @@ var prev=function(opts,cb,context) {
 	_iterate("prevTxtid",opts,cb,context);
 }
 
+var _clearHits=function(toc){
+	for (var i=0;i<toc.length;i++) {
+		//remove the field, make sure treenodehits will calculate new value.
+		if (typeof toc[i].hit!=="undefined") delete toc[i].hit;
+	}
+}
+
+var breadcrumb=function(db,opts,toc,tocname){
+	var vpos=opts.vpos;
+	if (opts.uti && typeof vpos==="undefined") {
+			vpos=db.txtid2vpos(opts.uti);
+	}
+	var p=bsearchVposInToc(toc,vpos,true);
+	if (p==-1) {
+		var out={nodeseq:[0],breadcrumb:[toc[0]]};
+	}  else {
+		var nodeseq=enumAncestors(toc,p);
+		nodeseq.push(p);
+		var breadcrumb=nodeseq.map(function(n){return toc[n]});
+		var out={ nodeseq: nodeseq, breadcrumb:breadcrumb};
+	}
+	if (tocname) {
+		out.name=tocname;
+		out.tocname=tocname; //legacy code
+		out.toc=toc;
+	}
+
+	return out;
+}
 var toc=function(opts,cb,context) {
 	var that=this;
-	kse.search(opts.db,opts.q,{},function(err,res){
-		if (err) {
-			cb(err);
-		} else {
-			var tocname=opts.tocname||res.engine.get("meta").tocs[0];
-			res.engine.getTOC({tocname:tocname},function(data){
-				cb(0,{name:tocname,toc:data,hits:res.rawresult,tocname:tocname});
+	
+	if (!opts.q) {
+		kde.open(opts.db,function(err,db){
+			var tocname=opts.name||opts.tocname||db.get("meta").toc;
+			db.getTOC({tocname:tocname},function(toc){
+				if (opts.vpos||opts.uti) {
+					cb(0,breadcrumb(db,opts,toc,tocname));
+				} else {
+					cb(0,{name:tocname,toc:toc,tocname:tocname});	
+				}
 			});
-		}
+		});
+		return;
+	}
+
+	kse.search(opts.db,opts.q,opts,function(err,res){
+		if (!res) throw "cannot open database "+opts.db;
+		var tocname=opts.name||opts.tocname||res.engine.get("meta").toc;
+		var db=res.engine;
+		res.engine.getTOC({tocname:tocname},function(toc){
+			_clearHits(toc);
+			if (opts.vpos||opts.uti) {
+					var out=breadcrumb(db,opts,toc,tocname);
+					out.nodeseq.map(function(seq){
+						//console.log(seq)
+						treenodehits(toc,res.rawresult,seq);
+					})
+					cb(0,out);
+			} else {
+				cb(0,{name:tocname,toc:toc,hits:res.rawresult,tocname:tocname});	
+			}
+		});
 	});
 }
 
@@ -4557,7 +4850,8 @@ var txtids2key=function(txtids) {
 	var out=[];
 	for (var i=0;i<txtids.length;i++) {
 		var fseg=this.txtid2fileSeg(txtids[i]);
-		out.push(["filecontents",fseg.file,fseg.seg]);
+		if (!fseg) out.push(["filecontents",0,0]);
+		else out.push(["filecontents",fseg.file,fseg.seg]);
 	}
 	return out;
 }
@@ -4569,44 +4863,107 @@ var hits2markup=function( Q,file,seg, text){
 	var hits=kse.excerpt.realHitInRange(Q,vpos,vpos2,text);
 	return hits;
 }
+
+var fetch_res=function(db,Q,opts,cb){
+	var uti=opts.uti;
+		if (!uti) {
+			uti=[];
+			var vpos=opts.vpos;
+			if (typeof vpos!="object") vpos=[vpos];
+			for (var i=0;i<vpos.length;i++) {
+				var u=db.vpos2txtid(vpos[i]);
+				uti.push(u);
+			}
+		}
+		if (typeof uti!=="object") uti=[uti];
+
+		var keys=txtids2key.call(db,uti);
+		if (!keys || !keys.length || typeof keys[0][1]=="undefined") {
+			cb("uti not found: "+uti+" in "+opts.db);
+			return;
+		}
+
+		db.get(keys,function(data){
+			var out=[],i=0;
+			for (i=0;i<keys.length;i++) {
+				var hits=null;
+				if (Q) hits=hits2markup.call(db,Q,keys[i][1],keys[i][2],data[i]);
+				var vpos=db.txtid2vpos(uti[i])||null;
+				var item={uti:uti[i],text:data[i],hits:hits,vpos:vpos};
+				if (opts.fields) {
+					var fields=opts.fields;
+					if (typeof fields=="string") fields=[fields];
+					item.values=[];
+					for (var j=0;j<fields.length;j++) {
+						item.values.push(getFieldByVpos(db,fields[j],vpos));
+					}
+				}
+				out.push(item);
+			}
+			if (typeof opts.breadcrumb!=="undefined") {
+				db.getTOC({tocname:opts.breadcrumb||db.get("meta").toc},function(toc){
+					for (i=0;i<out.length;i++) {
+						var oo=breadcrumb(db,{uti:out[i].uti},toc);
+						out[i].breadcrumb=oo.breadcrumb;
+						out[i].nodeseq=oo.nodeseq;
+					}
+					cb(0,out);
+				});
+			} else {
+				cb(0,out);
+			}
+			
+		});
+}
 var fetch=function(opts,cb,context) {
 	var that=this;
 	if (!opts.uti && !opts.vpos) {
 		cb("missing uti or vpos");
 		return;
 	}
-	kse.search(opts.db,opts.q,{},function(err,res){
-		if (err) {
-			cb(err);
-		} else {
-			var uti=opts.uti;
-			if (!uti) {
-				uti=[];
-				var vpos=opts.vpos;
-				if (typeof vpos!="object") vpos=[vpos];
-				for (var i=0;i<vpos.length;i++) {
-					var u=res.engine.vpos2txtid(vpos[i]);
-					uti.push(u);
-				}
-			}
-			if (typeof uti!=="object") uti=[uti];
-			var keys=txtids2key.call(res.engine,uti);
-			if (typeof keys[0][1]=="undefined") {
-				cb("uti not found: "+uti+" in "+opts.db);
-				return;
-			}
-
-			res.engine.get(keys,function(data){
-				var out=[];
-				for (var i=0;i<keys.length;i++) {
-					var hits=hits2markup.call(res.engine,res,keys[i][1],keys[i][2],data[i]);
-					var vpos=res.engine.txtid2vpos(uti[i]);
-					out.push({uti:uti[i],text:data[i],hits:hits,vpos:vpos});
-				}
-				cb(0,out);
-			});
+	var fetchfields=function(db,cb1){
+		var fields=opts.fields;
+		if (typeof opts.fields=="string") {
+			fields=[opts.fields];
 		}
-	});	
+
+		var fieldskey=[];
+		for (var i=0;i<fields.length;i++) {
+			fieldskey.push(["fields",fields[i]]);
+			fieldskey.push(["fields",fields[i]+"_vpos"]);
+		}
+		//console.log("fetching",fieldskey)
+		db.get(fieldskey,cb1);
+	}
+	if (!opts.q) {
+			kde.open(opts.db,function(err,db){
+				if (err) {
+					cb(err)
+				} else {
+					if (opts.fields) {
+						fetchfields(db,function(){
+							fetch_res(db,null,opts,cb);		
+						});
+					} else {
+						fetch_res(db,null,opts,cb);	
+					}
+				}
+			});
+	} else {
+		kse.search(opts.db,opts.q,opts,function(err,res){
+			if (err) {
+				cb(err);
+			} else {
+					if (opts.fields) {
+						fetchfields(res.engine,function(){
+							fetch_res(res.engine,res,opts,cb)
+						});
+					} else {
+						fetch_res(res.engine,res,opts,cb)		
+					}
+			}
+		});		
+	}
 }
 
 var excerpt2defaultoutput=function(excerpt) {
@@ -4615,18 +4972,29 @@ var excerpt2defaultoutput=function(excerpt) {
 		var ex=excerpt[i];
 		var vpos=this.fileSegToVpos(ex.file,ex.seg);
 		var txtid=this.vpos2txtid(vpos);
-		out.push({uti:txtid,text:ex.text,hits:ex.realHits});
+		out.push({uti:txtid,text:ex.text,hits:ex.realHits,vpos:vpos});
 	}
 	return out;
 }
 //use startfrom to specifiy starting posting
 var excerpt=function(opts,cb,context) {
 	var that=this;
+	var from=opts.from;
 	if (!opts.q) {
 		cb("missing q");
 		return;
 	}
-	kse.search(opts.db,opts.q,{nohighlight:true,range:{from:opts.from}},
+
+	var range={},newopts={};
+	if (opts.from) range.from=opts.from;
+	if (opts.count) range.maxseg=opts.count;
+	for (var i in opts) {
+		newopts[i]=opts[i];
+	}
+	newopts.nohighlight=true;
+	newopts.range=range;
+
+	kse.search(opts.db,opts.q,newopts,
 		function(err,res){
 		if (err) {
 			cb(err);
@@ -4647,7 +5015,7 @@ var beginWith=function(s,txtids) {
 	return out;
 }
 var scan=function(opts,cb,context) {
-	kse.search(opts.db,opts.q,{},function(err,res){
+	kse.search(opts.db,opts.q,opts,function(err,res){
 		if (err) {
 			cb(err);
 			return;
@@ -4664,31 +5032,39 @@ var scan=function(opts,cb,context) {
 }
 
 var filterField=function(items,regex,filterfunc) {
-	if (!regex) return items;
+	if (!regex) return [];
 	var reg=new RegExp(regex);
 	var out=[];
 	filterfunc=filterfunc|| reg.test.bind(reg);
 	for (var i=0;i<items.length;i++) {
 		var item=items[i];
 		if (filterfunc(item,regex)) {
-			out.push(item);
+			out.push({text:item,idx:i});
 		}
 	}
 	return out;
 }
 
-var groupByField=function(db,rawresult,field,regex,filterfunc,cb) {
+var _groupByField=function(db,rawresult,field,regex,filterfunc,postfunc,cb) {
 	db.get(["fields",field],function(fields){
-
+		if (!fields) {
+			cb("field "+field+" not found");
+			return;
+		}
 		db.get([["fields",field+"_vpos"],["fields",field+"_depth"]],function(res){
-			var fieldsvpos=res[0],fieldsdepth=res[1];
+			var items=[], fieldsvpos=res[0],fieldsdepth=res[1];
 			if (!rawresult||!rawresult.length) {
 				var matches=filterField(fields,regex,filterfunc);
-				cb(0,matches,null,fieldsvpos);
+
+				for (var i=0;i<matches.length;i++) {
+					var item=matches[i];
+					items.push({text:item.text, uti: db.vpos2txtid(fieldsvpos[item.idx]), vpos:fieldsvpos[item.idx]});
+				}
+				cb(0,items);
 			} else {
 				var fieldhits= plist.groupbyposting2(rawresult, fieldsvpos);
 				fieldhits.shift();
-		    var matches=[],hits=[],vpos=[];
+		    var out=[];
 		    var reg=new RegExp(regex);
 		    filterfunc=filterfunc|| reg.test.bind(reg);
 		    var prevdepth=65535,inrange=false;
@@ -4711,12 +5087,12 @@ var groupByField=function(db,rawresult,field,regex,filterfunc,cb) {
 
 		      if (!fieldhit || !fieldhit.length) continue;
 		      if (inrange) {
-		      	matches.push(item);
-		      	hits.push(fieldhit);
-		      	vpos.push(fieldhit[0]);
+		      	var item={text: item, vpos: fieldhit[0], uti:db.vpos2txtid(fieldhit[0]) , hits:fieldhit};
+		      	postfunc&&postfunc(item);
+		      	items.push(item);
 		      }
 		    }		
-				cb(0,matches,hits,vpos);
+				cb(0,items);
 			};
 		});
 	});
@@ -4725,43 +5101,79 @@ var groupByField=function(db,rawresult,field,regex,filterfunc,cb) {
 var groupByTxtid=function(db,rawresult,regex,filterfunc,cb) {
 	if (!rawresult||!rawresult.length) {
 		//no q , filter all field
-			var values=db.get("segnames");
-			var matches=filterField(values,regex,filterfunc);
-			cb(0,matches);
+		var values=db.get("segnames");
+		var segoffsets=db.get("segoffsets");
+		var matches=filterField(values,regex,filterfunc);
+
+		items=matches.map(function(item){
+			return {text:item.text, uti:item.text, vpos:segoffsets[item.idx]};
+		})
+		cb(0,items);
+
 	} else {
 		var segoffsets=db.get("segoffsets");
     var seghits= plist.groupbyposting2(rawresult, segoffsets); 
     var txtid=db.get("segnames");
-    var matches=[],hits=[];
+    var out=[];
     var reg=new RegExp(regex);
 		 filterfunc=filterfunc|| reg.test.bind(reg);
     for (var i=0;i<seghits.length;i++) {
       var seghit=seghits[i];
       if (!seghit || !seghit.length) continue;
       var item=txtid[i-1];
+      var vpos=segoffsets[i-1];
 		  if (filterfunc(item,regex)) {
-      	matches.push(item);
-      	hits.push(seghit);
+		  	out.push({text:item,uti:item,hits:seghit,vpos:vpos});
       }
     }
-    cb(0,matches,hits);
+    cb(0,out);
 	}
 }
 
+var _group=function(db,opts,res,cb){
+	filterfunc=opts.filterfunc||null;
+	var rawresult=res.rawresult;
+	if (opts.field) {
+		if (opts.ranges) rawresult=trimResult(rawresult,opts.ranges);
+		_groupByField(db,rawresult,opts.field,opts.regex,filterfunc,null,cb);
+	} else {
+		if ((!res.rawresult || !res.rawresult.length)&& res.query) {
+			cb(0,[]);//no search result
+		} else {
+			if (opts.ranges) rawresult=trimResult(rawresult,opts.ranges);
+			groupByTxtid(db,rawresult,opts.regex,filterfunc,cb);
+		}
+	}
+}
+var trimResult=function(rawresult,_ranges) {
+	//assume ranges not overlap
+	//TODO, combine continuous range
+	var res=[];
+	var ranges=JSON.parse(JSON.stringify(_ranges));
+	ranges.sort(function(a,b){return a[0]-b[0]});
+	for (var i=0;i<ranges.length;i++) {
+		var start=ranges[i][0],end=ranges[i][1];
+		var s=bsearch(rawresult,start,true);
+		var e=bsearch(rawresult,end,true);
+		var r=rawresult.slice(s,e);
+		res=res.concat(r);
+	}
+	return res;
+}
 var filter=function(opts,cb) {
-	kse.search(opts.db,opts.q,{},function(err,res){
-		if (err) {
-			cb(err);
+	if (!opts.q){
+		if (!opts.regex) {
+			cb(0,[]);
 			return;
 		}
-		var db=res.engine;
-		filterfunc=opts.filterfunc||null;
-		if (opts.field) {
-			groupByField(db,res.rawresult,opts.field,opts.regex,filterfunc,cb);
-		} else {
-			groupByTxtid(db,res.rawresult,opts.regex,filterfunc,cb);
-		}
-	});
+		kde.open(opts.db,function(err,db){
+			_group(db,opts,{rawresult:null},cb);
+		})
+	} else {
+		kse.search(opts.db,opts.q,opts,function(err,res){
+			_group(res.engine,opts,res,cb);
+		});
+	}
 }
 var listkdb=kde.listkdb;
 
@@ -4841,6 +5253,118 @@ var txtid2vpos=function(dbname,txtid,cb){
 		else cb(0,db.txtid2vpos(txtid));
 	});
 }
+
+var bsearchVposInToc = function (toc, obj, near) { 
+  var low = 0,
+  high = toc.length;
+  while (low < high) {
+    var mid = (low + high) >> 1;
+    if (toc[mid].vpos==obj) return mid-1;
+    toc[mid].vpos < obj ? low = mid + 1 : high = mid;
+  }
+  if (near) return low-1;
+  else if (toc[low].vpos==obj) return low;else return -1;
+};
+
+var enumAncestors=function(toc,n) {
+	var parents=[0];
+	var cur=toc[n];
+	var depth=0, now=0;
+	while ( toc[now+1]&&toc[now+1].vpos<= cur.vpos ) {
+		now++;
+		var next=toc[now].n;
+		//jump to sibling which has closest vpos
+		while ((next && toc[next].vpos<=cur.vpos) || toc[now+1].d==toc[now].d) {
+			if (next) {
+				now=next;
+				next=toc[now].n;				
+			} else {
+				next=now+1; //next row is sibling
+			}
+		}
+		if (toc[now].d>depth && toc[now].d<cur.d) {
+			parents.push(now);
+			depth=toc[now].d;
+		} else break;
+	}
+	return parents;
+}
+
+var sibling=function(opts,cb,context) {
+	var uti=opts.uti;
+
+	kde.open(opts.db,function(err,db){
+		if (typeof opts.vpos !=="undefined" && typeof opts.uti==="undefined") {
+			uti=db.vpos2txtid(opts.vpos);
+		}
+
+		var keys=txtids2key.call(db,uti);
+		
+		if (!keys) {
+			cb("invalid uti: "+uti);
+			return;
+		}
+		var segs=db.getFileSegNames(keys[0][1]);
+		if (!segs) {
+			cb("invalid file id: "+keys[0][1]);
+			return;			
+		}
+		var idx=segs.indexOf(uti);
+		cb(0,{sibling:segs,idx:idx});
+	});
+}
+var findField=function(array,item) {
+	for(var i=0;i<array.length;i++){
+		if (array[i]===item) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+var getFieldByVpos=function(db,field,vpos) {
+	//make sure field already in cache
+	var fieldvpos=db.get(["fields",field+"_vpos"]);
+	var fieldvalue=db.get(["fields",field]);
+	if (!fieldvpos || !fieldvalue)return null;
+
+	var i=bsearch(fieldvpos,vpos,true);
+	if (i>-1) return fieldvalue[i-1];
+}
+var getFieldRange=function(opts,cb,context){
+	var error=null;
+	if (!opts.field) error="missing field"
+	if (!opts.values && !opts.value) error="missing value"
+	if (!opts.db) error="missing db"
+	var values=opts.values;
+
+	if (opts.value && typeof opts.value=="string" && !opts.values){
+		values=[opts.value];
+	}
+	if (error) {
+		cb(error);
+		return;
+	}
+	get(opts.db,[["meta","vsize"],["fields",opts.field],["fields",opts.field+"_vpos"]],function(data){
+		if (!data) {
+			cb("error loading field "+opts.field);
+			return;
+		}
+		var vsize=data[0], fieldcaption=data[1], fieldvpos=data[2], out=[];
+		for (var i=0;i<values.length;i++) {
+			var v=values[i];
+			var p=findField(fieldcaption,v);
+			var start=vsize,end=vsize;
+			if (p>-1) start=fieldvpos[p];
+			if (p<fieldvpos.length-1) {
+				end=fieldvpos[p+1];
+			}
+			out.push([start,end]);
+		}
+		cb(0,out);
+	});
+}
+
 var API={
 	next:next,
 	prev:prev,
@@ -4850,6 +5374,7 @@ var API={
 	txtid2vpos:txtid2vpos,	
 	toc:toc,
 	fetch:fetch,
+	sibling:sibling,
 	excerpt:excerpt,
 	scan:scan,
 	filter:filter,
@@ -4857,7 +5382,10 @@ var API={
 	fillHits:fillHits,
 	renderHits:renderHits,
 	tryOpen:tryOpen,
-	get:get
+	get:get,
+	treenodehits:treenodehits,
+	getFieldRange:getFieldRange
 }
 module.exports=API;
-},{"ksana-database":"ksana-database","ksana-search":"ksana-search","ksana-search/plist":20}]},{},[]);
+
+},{"./treenodehits":22,"ksana-database":"ksana-database","ksana-search":"ksana-search","ksana-search/plist":20}]},{},[]);

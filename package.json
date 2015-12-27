@@ -1,7 +1,7 @@
 {
   "name": "ksana2015-scaffold-default",
   "description": "New Ksana application",
-  "version": "0.14.0",
+  "version": "1.5.0",
   "main": "index.html",
   "inject-js-start":"nwmain.js",
   "single-instance":true,
