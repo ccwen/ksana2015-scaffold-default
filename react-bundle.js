@@ -19188,7 +19188,12 @@ module.exports = warning;
 module.exports = require('react/lib/ReactComponentWithPureRenderMixin');
 },{"react/lib/ReactComponentWithPureRenderMixin":34}],"react-addons-update":[function(require,module,exports){
 module.exports = require('react/lib/update');
-},{"react/lib/update":131}],"react":[function(require,module,exports){
+},{"react/lib/update":131}],"react-dom":[function(require,module,exports){
+'use strict';
+
+module.exports = require('react/lib/ReactDOM');
+
+},{"react/lib/ReactDOM":37}],"react":[function(require,module,exports){
 'use strict';
 
 module.exports = require('./lib/React');
