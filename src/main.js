@@ -12,16 +12,22 @@ var maincomponent = React.createClass({
     }.bind(this));
   }
   ,renderItem:function(item,idx) {
-    return <div>{ksa.renderHits(item.text,item.hits,function(o,t){return E("span",o,t)})}</div>
+    return E("div",{},
+      ksa.renderHits(item.text,item.hits,
+        function(o,t){return E("span",o,t)}
+      )
+    );
   },
   setTofind:function(e) {
     this.setState({tofind:e.target.value})
   },
   render: function() {
-    return <div><input ref="tofind" value={this.state.tofind} onChange={this.setTofind}></input>
-    <button onClick={this.search} >Search</button>
-      {this.state.result.map(this.renderItem)}
-    </div>;
+    return E("div",{},
+      E("input", {ref:"tofind", value:this.state.tofind
+        ,onChange:this.setTofind}),
+      E("button",{onClick:this.search},"Search"),
+      this.state.result.map(this.renderItem)
+    );
   }
 });
 module.exports=maincomponent;
